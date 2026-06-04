@@ -1,0 +1,21 @@
+name: Auto-Deploy Qwen Chat
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  TAILSCALE_AUTH_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 370
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run setup
+        run: |
+          chmod +x setup.sh
+          sudo bash setup.sh
