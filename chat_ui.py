@@ -1,9 +1,9 @@
 import argparse
 import json
-import subprocess
 import sys
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from urllib.parse import urlparse, parse_qs
+from urllib.request import Request, urlopen
+from urllib.error import URLError
 
 OLLAMA_HOST = "http://localhost:11434"
 MODEL = "qwen2.5-coder:7b"
@@ -89,7 +89,7 @@ async function send(){
         try{
           const data=JSON.parse(line);
           if(data.done)break;
-          full+=data.content||'';
+          full+=data.response||'';
           botDiv.textContent=full;
           botDiv.classList.remove('typing');
           chat.scrollTop=chat.scrollHeight;
@@ -115,6 +115,25 @@ input.addEventListener('input',autoResize);
 </html>"""
 
 
+def stream_ollama(message):
+    body = json.dumps({
+        "model": MODEL,
+        "prompt": message,
+        "stream": True,
+    }).encode()
+    req = Request(f"{OLLAMA_HOST}/api/generate", data=body,
+                  headers={"Content-Type": "application/json"})
+    try:
+        resp = urlopen(req)
+        while True:
+            chunk = resp.read(4096)
+            if not chunk:
+                break
+            yield chunk
+    except URLError as e:
+        yield json.dumps({"error": str(e), "done": True}).encode()
+
+
 class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
@@ -138,26 +157,9 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
 
-            payload = json.dumps({
-                "model": MODEL,
-                "prompt": message,
-                "stream": True,
-            })
-
-            try:
-                proc = subprocess.Popen(
-                    ["curl", "-s", "-N", "-X", "POST",
-                     f"{OLLAMA_HOST}/api/generate",
-                     "-d", payload],
-                    stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                )
-                for line in iter(proc.stdout.readline, b""):
-                    self.wfile.write(line)
-                    self.wfile.flush()
-                proc.wait()
-            except Exception as e:
-                err = json.dumps({"error": str(e), "done": True})
-                self.wfile.write(f"{err}\n".encode())
+            for chunk in stream_ollama(message):
+                self.wfile.write(chunk)
+                self.wfile.flush()
         else:
             self.send_response(404)
             self.end_headers()
@@ -170,7 +172,6 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=8080)
     args = ap.parse_args()
-
     server = HTTPServer(("0.0.0.0", args.port), Handler)
     print(f"Chat UI running on http://0.0.0.0:{args.port}")
     try:
