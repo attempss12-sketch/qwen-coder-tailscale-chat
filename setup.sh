@@ -2,7 +2,7 @@
 set -e
 
 TAILSCALE_AUTH_KEY="tskey-auth-kXHWBzsmm411CNTRL-RdGH3VpLPV3uvpCn7qNcV3AWXGYDei8G"
-SHUTDOWN_DELAY="5h57m"
+SHUTDOWN_SECONDS=$((5*3600 + 57*60))
 PORT=8080
 
 log() { echo "[$(date '+%H:%M:%S')] $*"; }
@@ -12,7 +12,7 @@ cleanup() {
     kill $OLLAMA_PID 2>/dev/null || true
     kill $CHAT_PID 2>/dev/null || true
     sudo tailscale logout 2>/dev/null || true
-    sudo shutdown -h now
+    sudo shutdown -h now 2>/dev/null || true
 }
 trap cleanup EXIT INT TERM
 
@@ -56,12 +56,12 @@ log "============================================"
 log "  Chat UI ready!"
 log "  Local:      http://localhost:$PORT"
 log "  Tailscale:  http://$TAILSCALE_IP:$PORT"
-log "  Shutdown in: $SHUTDOWN_DELAY"
+log "  Shutdown in: 5h57m ($SHUTDOWN_SECONDS seconds)"
 log "============================================"
 log ""
 
-sleep "$SHUTDOWN_DELAY" &
+sleep "$SHUTDOWN_SECONDS" &
 SHUTDOWN_PID=$!
 wait $SHUTDOWN_PID
 
-log "Auto-shutdown triggered after $SHUTDOWN_DELAY"
+log "Auto-shutdown triggered after 5h57m"
